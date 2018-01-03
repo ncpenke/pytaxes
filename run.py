@@ -45,16 +45,19 @@ mediare_withheld = 0
 capital_gain_long = inputs.get('capital_gain_long', 0)
 capital_gain_short = inputs.get('capital_gain_short', 0)
 capital_gain_dist = inputs.get('capital_gain_dist', 0)
+total_proceeds = 0
 amt_capital_gain_long = inputs.get('amt_capital_gain_long', 0)
 state_withholding = 0
 medicare_withheld = 0
 tax_year = inputs.get('tax_year')
 
+F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
 F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
 MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
 
 for f in forms:
     if isinstance(f, StockSale):
+        total_proceeds += f.get('total_proceeds', 0.0)
         wages += f.get('ordinary_income', 0.0)
         capital_gain_short += f.get('capital_gain_short', 0.0)
         capital_gain_long += f.get('capital_gain_long', 0.0)
@@ -63,6 +66,7 @@ for f in forms:
         t = f.get('type')
         if t  == 'w2':
             wages += f.get('1')
+            total_proceeds += f.get('1')
             withholding += f.get('2')
             wages_ss += f.get('3')
             ss_withheld += f.get('4')
@@ -85,5 +89,27 @@ f = F1040(inputs)
 f.printAllForms()
 
 if inputs['state'] == 'MN':
-    m = MNm1(inputs, f)
-    m.printAllForms()
+    s = MNm1(inputs, f)
+    s.printAllForms()
+
+if total_proceeds > 0:
+    print("Total: %s" % total_proceeds)
+    fowed = f['78']
+    ftax = f['47']
+    sowed = s['30']
+    stax = s['9']
+    agi = f['37']
+
+    print("AGI: %s" % agi)
+    print("Tax owed: %s" % (ftax + stax))
+    print("Post tax: %s" % (total_proceeds - (ftax + stax)))
+    print("Post tax owed: %s" % (total_proceeds - (fowed + sowed)))
+
+    for f in f.forms:
+        if isinstance(f, F8801):
+            print("AMT credit carryforward: %s" % f['26'])
+
+    print("Effective federal tax rate: %.2f%%" % ((ftax / float(agi)) * 100))
+    print("Effective state tax rate: %.2f%%" % ((stax / float(agi)) * 100))
+    
+          
