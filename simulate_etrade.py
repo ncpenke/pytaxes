@@ -107,7 +107,7 @@ def process_exercise_iso(iso, exercisePrice):
         t = iso.rowVal(row, 'Record Type')
         if (t == 'Grant'):
             grantPrice = float(iso.rowVal(row, 'Exercise Price'))
-            n = float(iso.rowVal(row, 'Granted Qty.'))
+            n = float(iso.rowVal(row, 'Exercisable Qty.')[0])
             forms.append(StockExerciseISO(exercisePrice, grantPrice, n))
             total += exercisePrice * n
             totalShares += n
