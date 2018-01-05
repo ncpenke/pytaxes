@@ -16,11 +16,12 @@ from os import getcwd
 from os.path import dirname
 from stock import *
 import etrade
+import simulate_etrade
 
 def usage():
     print('Usage: %s configuration tax-documents' % sys.argv[0])
 
-if len(sys.argv) < 3:
+if len(sys.argv) < 2:
     usage()
     sys.exit(1)
 
@@ -31,10 +32,16 @@ inputs = importlib.import_module(sys.argv[1]).conf
 forms = []
 
 for a in sys.argv[2:]:
-    if a == "etrade.xlsx":
-        forms += etrade.process_gains_and_losses(a)
-    else:
-        forms += importlib.import_module(a).forms
+    forms += importlib.import_module(a).forms
+
+if 'etrade' in inputs:
+    forms += etrade.process_gains_and_losses(inputs['etrade'])
+
+if 'simulate_etrade' in inputs:
+    if 'simulate_sale_price' in inputs:
+        forms += simulate_etrade.simulate_sale_price(inputs['simulate_etrade'], inputs['simulate_sale_price'])[2]
+    if 'simulate_exercise_price' in inputs:
+        forms += simulate_etrade.simulate_exercise_price(inputs['simulate_etrade'], inputs['simulate_exercise_price'])[2]
 
 wages = 0
 wages_ss = 0
@@ -47,10 +54,12 @@ capital_gain_short = inputs.get('capital_gain_short', 0)
 capital_gain_dist = inputs.get('capital_gain_dist', 0)
 total_proceeds = 0
 amt_capital_gain_long = inputs.get('amt_capital_gain_long', 0)
+amt_iso_exercise = inputs.get('amt_iso_exercise', 0)
 state_withholding = 0
 medicare_withheld = 0
 tax_year = inputs.get('tax_year')
 
+FilingStatus = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").FilingStatus
 F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
 F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
 MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
@@ -62,6 +71,8 @@ for f in forms:
         capital_gain_short += f.get('capital_gain_short', 0.0)
         capital_gain_long += f.get('capital_gain_long', 0.0)
         amt_capital_gain_long += f.get('amt_capital_gain_long', f.get('capital_gain_long', 0.0))
+    if isinstance(f, StockExerciseISO):
+        amt_iso_exercise += f.get('amt_iso_exercise', 0.0)
     else:
         t = f.get('type')
         if t  == 'w2':
@@ -74,16 +85,30 @@ for f in forms:
             medicare_withheld += f.get('6')
             state_withholding += f.get('17')
 
-inputs['wages'] = [wages, 0.0]
-inputs['withholding'] = withholding
-inputs['wages_ss'] = [wages_ss, 0.0]
-inputs['ss_withheld'] = [ss_withheld, 0.0]
-inputs['wages_medicare'] = [wages_medicare, 0.0]
-inputs['medicare_withheld'] = [medicare_withheld, 0.0]
-inputs['state_withholding'] = state_withholding
-inputs['capital_gain_long'] = capital_gain_long
-inputs['capital_gain_short'] = capital_gain_short
-inputs['amt_capital_gain_long'] = amt_capital_gain_long
+if inputs['status'] == FilingStatus.JOINT:
+    inputs['wages'] = [wages, 0.0]
+    inputs['withholding'] = withholding
+    inputs['wages_ss'] = [wages_ss, 0.0]
+    inputs['ss_withheld'] = [ss_withheld, 0.0]
+    inputs['wages_medicare'] = [wages_medicare, 0.0]
+    inputs['medicare_withheld'] = [medicare_withheld, 0.0]
+    inputs['state_withholding'] = state_withholding
+    inputs['capital_gain_long'] = capital_gain_long
+    inputs['capital_gain_short'] = capital_gain_short
+    inputs['amt_capital_gain_long'] = amt_capital_gain_long
+    inputs['amt_iso_exercise'] = amt_iso_exercise
+else:
+    inputs['wages'] = wages
+    inputs['withholding'] = withholding
+    inputs['wages_ss'] = wages_ss
+    inputs['ss_withheld'] = ss_withheld
+    inputs['wages_medicare'] = wages_medicare
+    inputs['medicare_withheld'] = medicare_withheld
+    inputs['state_withholding'] = state_withholding
+    inputs['capital_gain_long'] = capital_gain_long
+    inputs['capital_gain_short'] = capital_gain_short
+    inputs['amt_capital_gain_long'] = amt_capital_gain_long
+    inputs['amt_iso_exercise'] = amt_iso_exercise
 
 f = F1040(inputs)
 f.printAllForms()

@@ -24,3 +24,7 @@ class StockSaleESPP(StockSale):
         gains = (sellPrice - purchasePrice - discount) * count
         StockSale.__init__(self, sellPrice, count, gains, False)
         self['ordinary_income'] = discount * count
+
+class StockExerciseISO(dict):
+    def __init__(self, exercisePrice, grantPrice, count):
+        self['amt_iso_exercise'] = (exercisePrice - grantPrice) * count
