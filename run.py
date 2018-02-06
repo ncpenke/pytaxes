@@ -18,30 +18,44 @@ from stock import *
 import etrade
 import simulate_etrade
 
-def usage():
-    print('Usage: %s configuration tax-documents' % sys.argv[0])
-
-if len(sys.argv) < 2:
-    usage()
-    sys.exit(1)
-
+sys.path.insert(0, getcwd())
 sys.path.append(dirname(sys.argv[0]))
-sys.path.append(getcwd())
 
-inputs = importlib.import_module(sys.argv[1]).conf
+conf = importlib.import_module("conf")
 forms = []
+forms += conf.w2s
+
+inputs = {}
+
+tax_year = conf.tax_year
+
+FilingStatus = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").FilingStatus
+F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
+F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
+MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
+
+if conf.status == 'single':
+    inputs['status'] = FilingStatus.SINGLE
+elif conf.status == 'married_joint':
+    inputs['status'] = FilingStatus.JOINT
+elif conf.status == 'married_separate':
+    inputs['status'] = FilingStatus.SEPARATE
+elif conf.status == 'head':
+    inputs['status'] = FilingStatus.HEAD
+else:
+    sys.exit("Unexpected filing status: " + conf.status)
 
 for a in sys.argv[2:]:
     forms += importlib.import_module(a).forms
 
-if 'etrade' in inputs:
-    forms += etrade.process_gains_and_losses(inputs['etrade'])
+if len(conf.etrade_statements) > 0:
+    forms += etrade.process_gains_and_losses(conf.etrade_statements)
 
-if 'simulate_etrade' in inputs:
-    if 'simulate_sale_price' in inputs:
-        forms += simulate_etrade.simulate_sale_price(inputs['simulate_etrade'], inputs['simulate_sale_price'])[2]
-    if 'simulate_exercise_price' in inputs:
-        forms += simulate_etrade.simulate_exercise_price(inputs['simulate_etrade'], inputs['simulate_exercise_price'])[2]
+if len(conf.etrade_holdings) > 0:
+    if conf.simulate_etrade_sale_price >= 0:
+        forms += simulate_etrade.simulate_sale_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)
+    if conf.simulate_etrade_exercise_price >= 0:
+        forms += simulate_etrade.simulate_exercise_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)
 
 wages = 0
 wages_ss = 0
@@ -49,29 +63,30 @@ wages_medicare = 0
 withholding = 0
 ss_withheld = 0
 mediare_withheld = 0
-capital_gain_long = inputs.get('capital_gain_long', 0)
-capital_gain_short = inputs.get('capital_gain_short', 0)
-capital_gain_dist = inputs.get('capital_gain_dist', 0)
+capital_gain_long = conf.capital_gain_long_dist + conf.capital_gain_long
+capital_gain_short = conf.capital_gain_short
+qualified_dividends = conf.qualified_dividends
+dividends = conf.dividends
 total_proceeds = 0
-amt_capital_gain_long = inputs.get('amt_capital_gain_long', 0)
-amt_iso_exercise = inputs.get('amt_iso_exercise', 0)
+stock_sale = False
+amt_capital_gain_long = capital_gain_long
+amt_iso_exercise = 0
 state_withholding = 0
 medicare_withheld = 0
-tax_year = inputs.get('tax_year')
-
-FilingStatus = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").FilingStatus
-F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
-F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
-MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
+group_life_insurance_taxable_costs = 0
+retirement_401k_contribution = 0
+hsa_employer_contribution = 0
+employer_sponsered_health_coverage_cost = 0
 
 for f in forms:
     if isinstance(f, StockSale):
+        stock_sale = True
         total_proceeds += f.get('total_proceeds', 0.0)
         wages += f.get('ordinary_income', 0.0)
         capital_gain_short += f.get('capital_gain_short', 0.0)
         capital_gain_long += f.get('capital_gain_long', 0.0)
         amt_capital_gain_long += f.get('amt_capital_gain_long', f.get('capital_gain_long', 0.0))
-    if isinstance(f, StockExerciseISO):
+    elif isinstance(f, StockExerciseISO):
         amt_iso_exercise += f.get('amt_iso_exercise', 0.0)
     else:
         t = f.get('type')
@@ -84,7 +99,13 @@ for f in forms:
             wages_medicare += f.get('5')
             medicare_withheld += f.get('6')
             state_withholding += f.get('17')
-
+            codes = f.get('12')
+            if isinstance(codes, dict):
+                group_life_insurance_taxable_costs = codes.get('C')
+                retirement_401k_contribution = codes.get('D')
+                hsa_employer_contribution = codes.get('W')
+                employer_sponsered_health_coverage_cost = codes.get('DD')
+                
 if inputs['status'] == FilingStatus.JOINT:
     inputs['wages'] = [wages, 0.0]
     inputs['withholding'] = withholding
@@ -92,11 +113,6 @@ if inputs['status'] == FilingStatus.JOINT:
     inputs['ss_withheld'] = [ss_withheld, 0.0]
     inputs['wages_medicare'] = [wages_medicare, 0.0]
     inputs['medicare_withheld'] = [medicare_withheld, 0.0]
-    inputs['state_withholding'] = state_withholding
-    inputs['capital_gain_long'] = capital_gain_long
-    inputs['capital_gain_short'] = capital_gain_short
-    inputs['amt_capital_gain_long'] = amt_capital_gain_long
-    inputs['amt_iso_exercise'] = amt_iso_exercise
 else:
     inputs['wages'] = wages
     inputs['withholding'] = withholding
@@ -104,37 +120,50 @@ else:
     inputs['ss_withheld'] = ss_withheld
     inputs['wages_medicare'] = wages_medicare
     inputs['medicare_withheld'] = medicare_withheld
-    inputs['state_withholding'] = state_withholding
-    inputs['capital_gain_long'] = capital_gain_long
-    inputs['capital_gain_short'] = capital_gain_short
-    inputs['amt_capital_gain_long'] = amt_capital_gain_long
-    inputs['amt_iso_exercise'] = amt_iso_exercise
+
+inputs['state_withholding'] = state_withholding
+inputs['capital_gain_long'] = capital_gain_long
+inputs['capital_gain_short'] = capital_gain_short
+inputs['amt_capital_gain_long'] = amt_capital_gain_long
+inputs['amt_iso_exercise'] = amt_iso_exercise
+inputs['qualifying_children'] = conf.qualifying_children
+inputs['exemptions'] = conf.exemptions
+inputs['estimated_state_tax_payments'] = conf.estimated_state_tax_payments
+inputs['extra_estimated_state_tax_payments'] = conf.extra_estimated_state_tax_payments
+inputs['qualified_dividends'] = qualified_dividends
+inputs['dividends'] = dividends
+inputs['retirement_401k_contribution'] = retirement_401k_contribution
+inputs['group_life_insurance_taxable_costs'] = group_life_insurance_taxable_costs
+inputs['hsa_employer_contribution'] = hsa_employer_contribution
+inputs['employer_sponsered_health_coverage_cost'] = employer_sponsered_health_coverage_cost
+
+inputs['F1040sa'] = { '16' : conf.donations }
 
 f = F1040(inputs)
 f.printAllForms()
 
-if inputs['state'] == 'MN':
+if conf.state == 'MN':
     s = MNm1(inputs, f)
     s.printAllForms()
 
-if total_proceeds > 0:
-    print("Total: %s" % total_proceeds)
-    fowed = f['78']
-    ftax = f['47']
-    sowed = s['30']
-    stax = s['9']
-    agi = f['37']
+print("Total Income: %.2f" % total_proceeds)
+fowed = f['78']
+ftax = f['47']
+sowed = s['30']
+stax = s['9']
+agi = f['37']
 
-    print("AGI: %s" % agi)
-    print("Tax owed: %s" % (ftax + stax))
-    print("Post tax: %s" % (total_proceeds - (ftax + stax)))
-    print("Post tax owed: %s" % (total_proceeds - (fowed + sowed)))
+print("AGI: %0.2f" % agi)
+print("Total Tax: %0.2f" % (ftax + stax))
+print("Federal Tax Owed: %0.2f" % fowed)
+print("State Tax Owed: %0.2f" % sowed)
+print("Post tax: %0.2f" % (total_proceeds - (ftax + stax)))
 
-    for f in f.forms:
-        if isinstance(f, F8801):
-            print("AMT credit carryforward: %s" % f['26'])
-
-    print("Effective federal tax rate: %.2f%%" % ((ftax / float(agi)) * 100))
-    print("Effective state tax rate: %.2f%%" % ((stax / float(agi)) * 100))
+for f in f.forms:
+    if isinstance(f, F8801):
+        print("AMT credit carryforward: %0.2f" % f['26'])
+        
+print("Effective federal tax rate: %.2f%%" % ((ftax / float(agi)) * 100))
+print("Effective state tax rate: %.2f%%" % ((stax / float(agi)) * 100))
     
           

@@ -50,5 +50,4 @@ def process_gains_and_losses(filename):
 
 if __name__ == "__main__":
     print json.dumps(process_gains_and_losses(sys.argv[1]))
- 
-        
+         
