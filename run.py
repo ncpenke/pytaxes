@@ -30,6 +30,7 @@ inputs = {}
 tax_year = conf.tax_year
 
 FilingStatus = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").FilingStatus
+Form = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").Form
 F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
 F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
 MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
@@ -126,6 +127,7 @@ inputs['capital_gain_long'] = capital_gain_long
 inputs['capital_gain_short'] = capital_gain_short
 inputs['amt_capital_gain_long'] = amt_capital_gain_long
 inputs['amt_iso_exercise'] = amt_iso_exercise
+inputs['prior_amt_credit'] = conf.prior_amt_credit
 inputs['qualifying_children'] = conf.qualifying_children
 inputs['exemptions'] = conf.exemptions
 inputs['estimated_state_tax_payments'] = conf.estimated_state_tax_payments
@@ -138,6 +140,7 @@ inputs['hsa_employer_contribution'] = hsa_employer_contribution
 inputs['employer_sponsered_health_coverage_cost'] = employer_sponsered_health_coverage_cost
 
 inputs['F1040sa'] = { '16' : conf.donations }
+inputs['prev_F6251'] = Form({'Form' : conf.pf6251 })
 
 f = F1040(inputs)
 f.printAllForms()
@@ -157,7 +160,8 @@ print("AGI: %0.2f" % agi)
 print("Total Tax: %0.2f" % (ftax + stax))
 print("Federal Tax Owed: %0.2f" % fowed)
 print("State Tax Owed: %0.2f" % sowed)
-print("Post tax: %0.2f" % (total_proceeds - (ftax + stax)))
+print("Total tax owed: %0.2f" % (fowed + sowed))
+print("Post tax owed: %0.2f" % (total_proceeds - (fowed + sowed)))
 
 for f in f.forms:
     if isinstance(f, F8801):

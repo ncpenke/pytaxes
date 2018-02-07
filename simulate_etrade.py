@@ -32,8 +32,8 @@ def process_sale(filename, sellPrice):
 
 def process_exercise(filename, exercisePrice):
     d = pyexcel_xlsx.get_data(filename)
-    iso = d['Options']
-    return process_exercise_iso(iso, exercisePrice)
+    options = d['Options']
+    return process_exercise_options(options, exercisePrice)
 
 def process_espp(espp, sellPrice):
     total = 0
@@ -97,22 +97,24 @@ def process_iso(iso, sellPrice):
     print("Num ISO: %s" % niso)
     return [ total, totalShares, forms ]
 
-def process_exercise_iso(iso, exercisePrice):
+def process_exercise_options(options, exercisePrice):
     total = 0
     totalShares = 0
     forms = []
-    iso = Sheet(iso)
-    niso = 0
-    for row in iso.rows:
-        t = iso.rowVal(row, 'Record Type')
+    options = Sheet(options)
+    nisos = 0
+    nnqos = 0
+    for row in options.rows:
+        t = options.rowVal(row, 'Record Type')
         if (t == 'Grant'):
-            grantPrice = float(iso.rowVal(row, 'Exercise Price'))
-            n = float(iso.rowVal(row, 'Exercisable Qty.')[0])
+            grantPrice = float(options.rowVal(row, 'Exercise Price'))
+            n = float(options.rowVal(row, 'Exercisable Qty.')[0])
             forms.append(StockExerciseISO(exercisePrice, grantPrice, n))
             total += exercisePrice * n
             totalShares += n
-            niso += n
-    print("Num exercised ISO: %s" % niso)
+            noptions += n
+    print("Num exercised ISO: %s" % nisos)
+    print("Num exercised NQO: %s" % nnqos)
     return [ total, totalShares, forms ]
 
 def simulate_sale_price(filename, sellPrice):

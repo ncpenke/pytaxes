@@ -12,19 +12,40 @@ class StockSaleRSU(StockSale):
         StockSale.__init__(self, sellPrice, count, gains, shortTerm)
 
 class StockSaleISO(StockSale):
-    # TODO: disqualified ISO sales
-    def __init__(self, grantPrice, exercisePrice, sellPrice, count):
-        gains = (sellPrice - grantPrice) * count
-        StockSale.__init__(self, sellPrice, count, gains, False)
-        self['amt_capital_gain_long'] = (sellPrice - exercisePrice) * count
+    def __init__(self, grantPrice, exercisePrice, sellPrice, count, disqualified):
+        if disqualified:
+            self['ordinary_income'] = (sellPrice - grantPrice) * count
+            StockSale.__init__(self, sellPrice, count, 0, False)
+        else:
+            gains = (sellPrice - grantPrice) * count
+            StockSale.__init__(self, sellPrice, count, gains, False)
+            self['amt_capital_gain_long'] = (sellPrice - exercisePrice) * count
+
+class StockSaleNQO(StockSale):
+    def __init__(self, grantPrice, exercisePrice, sellPrice, count, shortTerm):
+        gains = (sellPrice - exercisePrice) * count
+        StockSale.__init__(self, sellPrice, count, gains, shortTerm)
 
 class StockSaleESPP(StockSale):
-    # TODO: disqualified ESPP sales
-    def __init__(self, purchasePrice, discount, sellPrice, count):
+    def __init__(self, purchasePrice, discount, sellPrice, count, disqualified):
+        ordinaryIncome = discount * count
         gains = (sellPrice - purchasePrice - discount) * count
+        if disqualified:
+            ordinaryIncome += gains
+            gains = 0
         StockSale.__init__(self, sellPrice, count, gains, False)
-        self['ordinary_income'] = discount * count
+        assert(discount >= 0)
+        assert(ordinaryIncome >= 0)
+        self['ordinary_income'] = ordinaryIncome
 
 class StockExerciseISO(dict):
     def __init__(self, exercisePrice, grantPrice, count):
+        assert(exercisePrice > grantPrice)
         self['amt_iso_exercise'] = (exercisePrice - grantPrice) * count
+
+class StockExerciseNQO(dict):
+    def __init__(self, exercisePrice, grantPrice, count):
+        assert(exercisePrice > grantPrice)
+        self['ordinary_income'] = (exercisePrice - grantPrice) * count
+                     
+                    

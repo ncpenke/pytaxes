@@ -32,12 +32,14 @@ class GLProcessor:
                 self.sales.append(StockSaleISO(self.__get__(row, "Grant Price"),
                                                self.__get__(row, "Exercise Date FMV"),
                                                self.__get__(row, "Proceeds Per Share"),
-                                               self.__get__(row, "Qty.")))
+                                               self.__get__(row, "Qty."),
+                                               self.__get__(row, "Term") == "Short"))
             elif (type == "ESPP"):
                 self.sales.append(StockSaleESPP(self.__get__(row, "Acquisition Cost Per Share"),
                                                 self.__get__(row, "Discount Amount"),
                                                 self.__get__(row, "Proceeds Per Share"),
-                                                self.__get__(row, "Qty.")))
+                                                self.__get__(row, "Qty."),
+                                                self.__get__(row, "Term") == "Short"))
 
     def __get__(self, row, name):
         s = row[self.namestoidx[name]]
