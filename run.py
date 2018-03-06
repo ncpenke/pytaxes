@@ -18,6 +18,7 @@ from stock import *
 import etrade
 import simulate_etrade
 
+sys.path.insert(0, "/Users/ncpenke/code/pytaxes_forms")
 sys.path.insert(0, getcwd())
 sys.path.append(dirname(sys.argv[0]))
 
@@ -34,6 +35,7 @@ Form = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".form").Form
 F8801 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f8801").F8801
 F1040 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".f1040").F1040
 MNm1 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".mnm1").MNm1
+CA540 = importlib.import_module("pytaxes_forms.y" + str(tax_year) + ".ca540").CA540
 
 if conf.status == 'single':
     inputs['status'] = FilingStatus.SINGLE
@@ -54,11 +56,12 @@ if len(conf.etrade_statements) > 0:
 
 if len(conf.etrade_holdings) > 0:
     if conf.simulate_etrade_sale_price >= 0:
-        forms += simulate_etrade.simulate_sale_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)
+        forms += simulate_etrade.simulate_sale_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)[2]
     if conf.simulate_etrade_exercise_price >= 0:
-        forms += simulate_etrade.simulate_exercise_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)
+        forms += simulate_etrade.simulate_exercise_price(conf.etrade_holdings, conf.simulate_etrade_sale_price)[2]
 
 wages = 0
+wages_state = 0
 wages_ss = 0
 wages_medicare = 0
 withholding = 0
@@ -93,6 +96,7 @@ for f in forms:
         t = f.get('type')
         if t  == 'w2':
             wages += f.get('1')
+            wages_state += f.get('16')
             total_proceeds += f.get('1')
             withholding += f.get('2')
             wages_ss += f.get('3')
@@ -109,6 +113,7 @@ for f in forms:
                 
 if inputs['status'] == FilingStatus.JOINT:
     inputs['wages'] = [wages, 0.0]
+    inputs['wages_state'] = [wages_state, 0.0]
     inputs['withholding'] = withholding
     inputs['wages_ss'] = [wages_ss, 0.0]
     inputs['ss_withheld'] = [ss_withheld, 0.0]
@@ -116,6 +121,7 @@ if inputs['status'] == FilingStatus.JOINT:
     inputs['medicare_withheld'] = [medicare_withheld, 0.0]
 else:
     inputs['wages'] = wages
+    inputs['wages_state'] = wages_state
     inputs['withholding'] = withholding
     inputs['wages_ss'] = wages_ss
     inputs['ss_withheld'] = ss_withheld
@@ -128,6 +134,7 @@ inputs['capital_gain_short'] = capital_gain_short
 inputs['amt_capital_gain_long'] = amt_capital_gain_long
 inputs['amt_iso_exercise'] = amt_iso_exercise
 inputs['prior_amt_credit'] = conf.prior_amt_credit
+inputs['prior_state_amt_credit'] = conf.prior_state_amt_credit
 inputs['qualifying_children'] = conf.qualifying_children
 inputs['exemptions'] = conf.exemptions
 inputs['estimated_state_tax_payments'] = conf.estimated_state_tax_payments
@@ -145,15 +152,25 @@ inputs['prev_F6251'] = Form({'Form' : conf.pf6251 })
 f = F1040(inputs)
 f.printAllForms()
 
+sowed = 0
+stax = 0
+
 if conf.state == 'MN':
     s = MNm1(inputs, f)
-    s.printAllForms()
+    sowed = s['30']
+    stax = s['9']
+elif conf.state == 'CA':
+    s = CA540(inputs, f)
+    sowed = s['111']
+    stax = s['64']
+else:
+    sys.exit("Unsupported state: " + conf.state)
+
+s.printAllForms()
 
 print("Total Income: %.2f" % total_proceeds)
 fowed = f['78']
 ftax = f['47']
-sowed = s['30']
-stax = s['9']
 agi = f['37']
 
 print("AGI: %0.2f" % agi)
@@ -161,12 +178,13 @@ print("Total Tax: %0.2f" % (ftax + stax))
 print("Federal Tax Owed: %0.2f" % fowed)
 print("State Tax Owed: %0.2f" % sowed)
 print("Total tax owed: %0.2f" % (fowed + sowed))
+
 print("Post tax owed: %0.2f" % (total_proceeds - (fowed + sowed)))
 
 for f in f.forms:
     if isinstance(f, F8801):
         print("AMT credit carryforward: %0.2f" % f['26'])
-        
+
 print("Effective federal tax rate: %.2f%%" % ((ftax / float(agi)) * 100))
 print("Effective state tax rate: %.2f%%" % ((stax / float(agi)) * 100))
     

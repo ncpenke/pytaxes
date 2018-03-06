@@ -26,9 +26,10 @@ def process_sale(filename, sellPrice):
     espp = d['ESPP']
     rsu = d['Restricted Stock']
     iso = d['Options']
-    r = process_espp(espp)
-    r += process_rsu(rsu)
-    r += process_iso(iso)
+    r = process_espp(espp, sellPrice)
+    r += process_rsu(rsu, sellPrice)
+    r += process_iso(iso, sellPrice)
+    return r
 
 def process_exercise(filename, exercisePrice):
     d = pyexcel_xlsx.get_data(filename)
@@ -51,7 +52,7 @@ def process_espp(espp, sellPrice):
             n = float(espp.rowVal(row, 'Sellable Qty.'))
             d = espp.rowVal(row, 'Purchase Date')
             if '2017' not in d:
-                forms.append(StockSaleESPP(purchasePrice, discount, sellPrice, n))
+                forms.append(StockSaleESPP(purchasePrice, discount, sellPrice, n, False))
                 total += sellPrice * n
                 totalShares += n
                 nespp += n
@@ -67,7 +68,7 @@ def process_rsu(rsu, sellPrice):
     for row in rsu.rows:
         t = rsu.rowVal(row, 'Record Type')
         if t == 'Sellable Shares':
-            n = rsu.rowVal(row, 'Sellable Qty.')
+            n = rsu.rowVal(row, 'Sellable Qty.')[2]
             basis = float(rsu.rowVal(row, 'Est. Cost Basis (per share):'))
             taxStatus = rsu.rowVal(row, 'Tax Status SL')
             if taxStatus == 'Long Term':
@@ -88,9 +89,9 @@ def process_iso(iso, sellPrice):
         t = iso.rowVal(row, 'Record Type')
         if (t == 'Sellable Shares'):
             exercisePrice = float(iso.rowVal(row, 'Exercise Price'))
-            n = float(iso.rowVal(row, 'Sellable Qty.'))
+            n = float(iso.rowVal(row, 'Sellable Qty.')[1])
             grantPrice = float(iso.rowVal(row, 'Est. Cost Basis (per share):'))
-            forms.append(StockSaleISO(grantPrice, exercisePrice, sellPrice, n))
+            forms.append(StockSaleISO(grantPrice, exercisePrice, sellPrice, n, True))
             total += sellPrice * n
             totalShares += n
             niso += n
