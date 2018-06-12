@@ -33,6 +33,9 @@ state = 'MN'
 #
 ################################################################
 
+# Estimated payments for federal taxes
+estimated_payments = 0
+
 # State tax payments that were made on or before december 31st of the
 # tax year. Ex: If you're estimating taxes for 2017 then include the
 # state tax payments that were made on or before December 31, 2017. Do

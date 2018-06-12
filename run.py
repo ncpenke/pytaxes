@@ -137,6 +137,7 @@ inputs['prior_amt_credit'] = conf.prior_amt_credit
 inputs['prior_state_amt_credit'] = conf.prior_state_amt_credit
 inputs['qualifying_children'] = conf.qualifying_children
 inputs['exemptions'] = conf.exemptions
+inputs['estimated_payments'] = conf.estimated_payments
 inputs['estimated_state_tax_payments'] = conf.estimated_state_tax_payments
 inputs['extra_estimated_state_tax_payments'] = conf.extra_estimated_state_tax_payments
 inputs['qualified_dividends'] = qualified_dividends
@@ -175,6 +176,8 @@ agi = f['37']
 
 print("AGI: %0.2f" % agi)
 print("Total Tax: %0.2f" % (ftax + stax))
+print("Federal Tax: %0.2f" % ftax)
+print("State Tax: %0.2f" % stax)
 print("Federal Tax Owed: %0.2f" % fowed)
 print("State Tax Owed: %0.2f" % sowed)
 print("Total tax owed: %0.2f" % (fowed + sowed))
